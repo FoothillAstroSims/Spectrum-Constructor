@@ -15,6 +15,7 @@
             }
             
             .full-width {
+                display:flex;
                 width:100%;
                 float:left;
             }
@@ -75,27 +76,14 @@
             <h3><a href="https://foothill.edu/astronomy/astrosims.html" target=_blank>AstroSims</a> > Spectrum constructor</h3>
         </div>
 
-        <div id="diffractionGratingView" class="full-width">
-            Diffraction grating view
-            <canvas id="diffractionGratingDisplay" width="700" height="170"></canvas>
-        </div>
-    
-        <div id="spectrumPlot" class="full-width" style="width:700px;height:300px;">
-        </div>
-
-        <div id="eyeballDirectView" class="full-width" style="width:700px;height:250px;">
-            By-eye view of the color
-            <canvas id="byEyeDisplay" width="200" height="200"></canvas>
-        </div>        
-    
-        <div id="controlBar" class="full-width">
+      <div id="controlBar" class="full-width">
             
             <div id="continuousControl" class="inputs">Continuous spectrum: <br>
                 <input type="radio" id="visibleOff"  name="continuumType" value = "none" onclick="updateDisplay();" > None <br>
                 <input type="radio" id="visibleOn"  name="continuumType" value = "visible" onclick="updateDisplay();" checked> Visible <br>
-                <input type="radio" id="thermalOn"  name="continuumType" value = "thermal" onclick="updateDisplay();" > Thermal <br>
+                <input type="radio" id="thermalOn"  name="continuumType" value = "thermal" onclick="updateDisplay();" > Thermal
                 <input type="text" id="temperatureDisplay" size="6" value="Error" readonly="true"> K<br>
-                100 K <input id="temperatureSlider" type ="range" min="100" max="20000" step="10" value="Error" oninput="updateDisplay()"> 20,000 K <br>            
+                <input id="temperatureSlider" type ="range" min="100" max="20000" step="10" value="Error" oninput="updateDisplay()"> <br>            
             </div>
             
             <div id="emissionCheckboxes" class="inputs">
@@ -117,11 +105,30 @@
                 <input type="checkbox" id="HgAbsorption" value="Mercury" onclick="updateDisplay();">Mercury <br>
                 <input type="checkbox" id="NeAbsorption" value="Neon" onclick="updateDisplay();">Neon
             </div>
+          
+            <div id="eyeballDirectView">
+                <center>Eyeball view</center> <br>
+                <canvas id="byEyeDisplay" width="150" height="150"></canvas>
+            </div>  
+        </div>
+        
+        
+        
+        <div id="diffractionGratingView" class="full-width">
+            <canvas id="diffractionGratingDisplay" width="700" height="170"></canvas>
+        </div>
+    
+        <div id="spectrumPlot" class="full-width" style="width:700px;height:300px;">
         </div>
 
+      
+    
+  
         <div id="explanatoryText" class="bodyText">
             
             <p> This is demonstration of two views of a spectrum - the "by eye" view through a diffraction grating and a 1D spectrum plot (as from a spectrometer).  This also illustrates the color each combination of wavelengths would look to the human eye.  </p>
+            
+            <p> The brightnesses for the emission lines are not based on calculations of gas temperature, density, and radiation field.  They are approximations, tuned to approximate what is seen in the particular set of emission lamps currently used by the Foothill college </p>
     
             <a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.
     
@@ -134,7 +141,7 @@
             var canvasDiffGrat = document.getElementById("diffractionGratingDisplay");
             var contextDiffGrat = canvasDiffGrat.getContext("2d");
             var xBase = 50;     // left edge of spectra 
-            var yBase = 100;     // y base for the emission spectra
+            var yBase = 110;     // y base for the emission spectra
 
             // define variables for thermal spectrum
             var temperature = 5800;
@@ -158,15 +165,9 @@
                 brightness.push(1);
             }
           
-            plotter = document.getElementById('spectrumPlot');
-            Plotly.react( plotter, [{
-                x: wavelengths,
-                y: brightness }], {
-                margin: { t: 0 } } );
-
-            
             // initialize underlying data and the display
             initializeDisplay();
+            updateDisplay();
       
             
             function initializeDisplay() {
@@ -200,10 +201,15 @@
                 
                 contextDiffGrat.strokeStyle  = "white";
                 contextDiffGrat.font = '18pt Calibri';
+                contextDiffGrat.fillText("Diffraction grating view", 125, 15);
+
+                contextDiffGrat.strokeStyle  = "white";
+                contextDiffGrat.font = '18pt Calibri';
                 contextDiffGrat.fillText("Wavelength (nm)", 0.5*canvasDiffGrat.width, yBase+44);
                 
                 diffGratUpdate();
                 initializeStarGraphics();
+                initializePlot();
     }
             
             function updateDisplay() {
@@ -290,7 +296,7 @@
                 }
                  
                 // make plot
-                Plotly.react(plotter, [{x: wavelengths, y: brightness }], { margin: { t: 0 } } );
+                Plotly.react(plotter, [{x: wavelengths, y: brightness }], plotLayout );
             
                 // make diffraction grating view
                 
@@ -299,6 +305,49 @@
                 starUpdate();
                 diffGratUpdate(wavelengths, brightness);
                 
+            }
+            
+            function initializePlot() {
+                // initialize plot
+                plotter = document.getElementById('spectrumPlot');
+                
+                plotLayout = {
+                    margin: { t: 30, l:xBase, r:50 },
+                    title: {
+                        text: 'Spectrometer view',
+                        font: {
+                                family: 'Calibri, monospace',
+                                size: 22,
+                                color: 'black'
+                        },
+                        x: 0.01,
+                        y: 1
+                    },
+                    xaxis: {
+                        title: {
+                            text: 'Wavelength (nm)',
+                            font: {
+                                family: 'Calibri, monospace',
+                                size: 18,
+                                color: 'black'
+                            },
+                            standoff: 10
+                        },
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Brightness',
+                            font: {
+                                family: 'Calibri, monospace',
+                                size: 18,
+                                color: 'black'
+                            }
+                        }
+                    }
+                };
+
+                //Plotly.react( plotter, [{x: wavelengths, y: brightness }], {margin: { t: 0 } } );
+                Plotly.react( plotter, [{x: wavelengths, y: brightness }], plotLayout );
             }
             
             function initializeStarGraphics() {
