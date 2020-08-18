@@ -78,12 +78,18 @@
 
       <div id="controlBar" class="full-width">
             
-            <div id="continuousControl" class="inputs">Continuous spectrum: <br>
+            <div id="continuousControl" class="inputs">
+                Continuous spectrum: <br>
                 <input type="radio" id="visibleOff"  name="continuumType" value = "none" onclick="updateDisplay();" > None <br>
                 <input type="radio" id="visibleOn"  name="continuumType" value = "visible" onclick="updateDisplay();" checked> Visible <br>
                 <input type="radio" id="thermalOn"  name="continuumType" value = "thermal" onclick="updateDisplay();" > Thermal
                 <input type="text" id="temperatureDisplay" size="6" value="Error" readonly="true"> K<br>
-                <input id="temperatureSlider" type ="range" min="100" max="20000" step="10" value="Error" oninput="updateDisplay()"> <br>            
+                <input id="temperatureSlider" type ="range" min="100" max="20000" step="10" value="Error" oninput="updateDisplay()"> <br>
+                <br>
+                <input type="text" id="speedDisplay" size="6" value="Error" readonly="true"> % of c<br>
+                <input type="text" id="speedDisplay2" size="8" value="Error" readonly="true"> km/s<br>
+                <input id="speedSlider" type ="range" min="-10" max="10" step="0.01" value="Error" oninput="updateDisplay()"> <br>
+
             </div>
             
             <div id="emissionCheckboxes" class="inputs">
@@ -129,7 +135,11 @@
             <p> This is demonstration of two views of a spectrum - the "by eye" view through a diffraction grating and a 1D spectrum plot (as from a spectrometer).  This also illustrates the color each combination of wavelengths would look to the human eye.  </p>
             
             <p> The brightnesses for the emission lines are not based on calculations of gas temperature, density, and radiation field.  They are approximations, tuned to approximate what is seen in the particular set of emission lamps currently used by the Foothill College Astronomy Department.</p>
+            
+            <p>  The Doppler shift shows only the shift in emission wavelength, without adjusting the brightness (which in the thermal emission case is reported in W per sq. meter per steradian per meter - divide by 10^12 for the more intuitive kW per sq. meter per steradian per nm).</p>
     
+            <p>Please give us <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=n7L3RQCxQUyAT7NBighZStjAWTIFlutChq8ZZEGLLMdUQlMxRFZGMldMMzFKNElXN0tUTkE2STZEUi4u" target="_blank">feedback!</a></p>
+            
             <a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.
     
         </div>
@@ -159,11 +169,13 @@
             }
 
             // Initialize wavelength and brightness array
-            var wavelengths = [], waveMin = 400, waveMax = 700, brightness = [];
+            var wavelengths = [], waveMin = 300, waveMax = 800, brightness = [];
             for (i=waveMin; i < waveMax+1; i++) {
                 wavelengths.push(i);
                 brightness.push(1);
             }
+            console.log(wavelengths);
+            var shiftedWavelengths = wavelengths; 
           
             // initialize underlying data and the display
             initializeDisplay();
@@ -218,6 +230,11 @@
           
                 temperature = document.getElementById('temperatureSlider').value;
                 document.getElementById('temperatureDisplay').value = temperature;
+                
+                speed = document.getElementById('speedSlider').value;
+                document.getElementById('speedDisplay').value = speed;
+                document.getElementById('speedDisplay2').value = speed * 2.997e3;
+                
           
                 // check to see which elements are selected for emission
                 if (document.getElementById("HEmission").checked == true) {emissionOn[0] = 1} else {emissionOn[0] = 0};
@@ -235,6 +252,12 @@
                 if (document.getElementById("HgAbsorption").checked == true) {absorptionOn[4] = 1} else {absorptionOn[4] = 0};
                 if (document.getElementById("NeAbsorption").checked == true) {absorptionOn[5] = 1} else {absorptionOn[5] = 0};
 
+                // Reset wavelength and brightness array
+                wavelengths = []
+                for (i=waveMin; i < waveMax+1; i++) {
+                    wavelengths.push(i);
+                }
+                
                 // set initial continuous spectrum
                 brightness = [];
                 //console.log(continuumType);
@@ -294,16 +317,19 @@
                         }
                     }
                 }
+                
+                // apply doppler shift
+                shiftedWavelengths = DopplerShift(wavelengths, speed);
                  
                 // make plot
-                Plotly.react(plotter, [{x: wavelengths, y: brightness }], plotLayout );
+                Plotly.react(plotter, [{x: shiftedWavelengths, y: brightness }], plotLayout );
             
                 // make diffraction grating view
                 
         
                 // make eyeball view
                 starUpdate();
-                diffGratUpdate(wavelengths, brightness);
+                diffGratUpdate();
                 
             }
             
@@ -324,6 +350,8 @@
                         y: 1
                     },
                     xaxis: {
+                        range: [400, 700],
+                        fixedrange: true,
                         title: {
                             text: 'Wavelength (nm)',
                             font: {
@@ -372,8 +400,8 @@
                 var bSum = 0;
                 var brightSum = 0;
                 
-                for (var i = 0; i < wavelengths.length; i++) {
-                    var newRGB = getLineColor(wavelengths[i], brightness[i]/maxBrightness);
+                for (var i = 0; i < shiftedWavelengths.length; i++) {
+                    var newRGB = getLineColor(shiftedWavelengths[i], brightness[i]/maxBrightness);
                     rSum += newRGB[0];
                     gSum += newRGB[1];
                     bSum += newRGB[2];
@@ -397,16 +425,22 @@
 
                 contextDiffGrat.fillStyle = "black";
                 contextDiffGrat.fillRect(xBase, yBase,600, -80);
-                contextDiffGrat.lineWidth = 2;
+                contextDiffGrat.lineWidth = 3;
            
                 var maxBrightness = Math.max(...brightness);  // ... is the spread operator
-                for (var i = 0; i < wavelengths.length; i++) {
-                    var newRGB = getLineColor(wavelengths[i], brightness[i]/maxBrightness);
+                
+                var index400 = indexOfClosestMatch(shiftedWavelengths, 400); 
+                var index700 = indexOfClosestMatch(shiftedWavelengths, 700);
+                console.log(index400, index700);
+                
+                for (var i = index400; i < index700; i++) {
+                    var newRGB = getLineColor(shiftedWavelengths[i], brightness[i]/maxBrightness);
                     if (maxBrightness == 0) {newRGB = [0,0,0]};
                     contextDiffGrat.strokeStyle  = "rgb("+newRGB[0]+","+newRGB[1]+","+newRGB[2]+")";
                     contextDiffGrat.beginPath();
-                    contextDiffGrat.moveTo(xBase+2*i, yBase);
-                    contextDiffGrat.lineTo(xBase+2*i, yBase-80);
+                    var xPosition = 2*(shiftedWavelengths[i] - 400)+xBase;
+                    contextDiffGrat.moveTo(xPosition, yBase);
+                    contextDiffGrat.lineTo(xPosition, yBase-80);
                     contextDiffGrat.stroke();
                 }
             }
@@ -479,6 +513,30 @@
                 }
                 //console.log(xs, height, center, spread, ys);
                 return ys;
+            }
+            
+            function indexOfClosestMatch(arr, matchValue) {
+                if (arr.length === 0) {
+                    return -1;
+                }
+                var matchDistance = Math.abs(arr[0]-matchValue);
+                var matchIndex = 0;
+                
+                for (var i = 1; i < arr.length; i++) {
+                    if (Math.abs(arr[i]-matchValue) < matchDistance) {
+                        matchIndex = i;
+                        matchDistance = Math.abs(arr[i]-matchValue);
+                    }
+                }
+                return matchIndex;
+            }
+            
+            function DopplerShift(wavelengths, speed) {
+                var shiftedWavelengths = [];
+                for (var i = 0; i < wavelengths.length; i++) {
+                    shiftedWavelengths.push(wavelengths[i]* (1+speed/100));
+                }
+                return shiftedWavelengths;
             }
                    
             function initializeLineData(){
